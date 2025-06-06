@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Rush - Платформер для настоящих мужиков</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #game-canvas {
+            background: linear-gradient(to bottom, #1d2b64, #3a6186);
+            display: block;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+        
+        .game-title {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffcc00;
+            text-shadow: 3px 3px 0 #ff3300, 6px 6px 0 rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+            z-index: 10;
+            animation: titleGlow 2s infinite alternate;
+        }
+        
+        @keyframes titleGlow {
+            from { text-shadow: 3px 3px 0 #ff3300, 6px 6px 0 rgba(0, 0, 0, 0.5); }
+            to { text-shadow: 3px 3px 0 #ff3300, 6px 6px 20px #ffcc00, 9px 9px 0 rgba(0, 0, 0, 0.5); }
+        }
+        
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 20;
+            text-align: center;
+        }
+        
+        .start-screen {
+            background: radial-gradient(circle, #1a2a6c, #000);
+        }
+        
+        .game-over-screen {
+            display: none;
+        }
+        
+        h1 {
+            color: #ffcc00;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #ff6600;
+        }
+        
+        h2 {
+            color: #ffcc00;
+            font-size: 32px;
+            margin-bottom: 30px;
+        }
+        
+        p {
+            color: #fff;
+            font-size: 20px;
+            max-width: 80%;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        
+        .controls {
+            background: rgba(255, 204, 0, 0.2);
+            border: 2px solid #ffcc00;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            background: linear-gradient(to bottom, #ff6600, #cc3300);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .btn:hover {
+            background: linear-gradient(to bottom, #ff9933, #ff3300);
+            transform: scale(1.05);
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.7);
+        }
+        
+        .nostalgia-items {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .nostalgia-item {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+        }
+        
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1),
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="scanlines"></div>
+        <div class="game-title">RETRO RUSH: МУЖИК ПРОТИВ ВРЕМЕНИ</div>
+        
+        <div class="screen start-screen" id="start-screen">
+            <h1>RETRO RUSH</h1>
+            <h2>МУЖИК ПРОТИВ ВРЕМЕНИ</h2>
+            <p>1985 год. Ты - настоящий мужик, прошедший Афган. Твоя задача - собрать пиво, избежать налоговой и вернуть магнитофон, который забрали бандиты!</p>
+            
+            <div class="controls">
+                <p>Управление: ← → для движения, ПРОБЕЛ для прыжка</p>
+                <p>Собери 10 банок пива, чтобы получить бонус!</p>
+            </div>
+            
+            <button class="btn" id="start-btn">НАЧАТЬ ИГРУ</button>
+            
+            <div class="nostalgia-items">
+                <div class="nostalgia-item">🍺</div>
+                <div class="nostalgia-item">📼</div>
+                <div class="nostalgia-item">📠</div>
+                <div class="nostalgia-item">🚬</div>
+            </div>
+        </div>
+        
+        <div class="screen game-over-screen" id="game-over-screen">
+            <h1>ИГРА ОКОНЧЕНА</h1>
+            <h2 id="final-score">Счет: 0</h2>
+            <p>В следующий раз будь внимательнее к налоговой и бандитам!</p>
+            <button class="btn" id="restart-btn">ИГРАТЬ СНОВА</button>
+        </div>
+        
+        <div class="ui-overlay">
+            <div id="score">Очки: 0</div>
+            <div id="lives">Жизни: 3</div>
+            <div id="beer">Пиво: 0/10</div>
+        </div>
+        
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        // Элементы игры
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const beerDisplay = document.getElementById('beer');
+        const finalScoreDisplay = document.getElementById('final-score');
+
+        // Размеры персонажа
+        const playerWidth = 40;
+        const playerHeight = 60;
+
+        // Игровой объект
+        const game = {
+            running: false,
+            score: 0,
+            lives: 3,
+            beerCollected: 0,
+            level: 1,
+            gravity: 0.5,
+            keys: {},
+            platforms: [],
+            beers: [],
+            enemies: [],
+            nostalgiaItems: [],
+            player: {
+                x: 50,
+                y: canvas.height - playerHeight - 50,
+                width: playerWidth,
+                height: playerHeight,
+                velocityX: 0,
+                velocityY: 0,
+                speed: 5,
+                jumping: false,
+                direction: 1
+            }
+        };
+
+        // Клавиши управления
+        window.addEventListener('keydown', (e) => {
+            game.keys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            game.keys[e.code] = false;
+        });
+
+        // Начало игры
+        startBtn.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            resetGame();
+            game.running = true;
+            gameLoop();
+        });
+
+        // Перезапуск игры
+        restartBtn.addEventListener('click', () => {
+            gameOverScreen.style.display = 'none';
+            resetGame();
+            game.running = true;
+            gameLoop();
+        });
+
+        // Сброс игры
+        function resetGame() {
+            game.score = 0;
+            game.lives = 3;
+            game.beerCollected = 0;
+            game.level = 1;
+            
+            game.player = {
+                x: 50,
+                y: canvas.height - playerHeight - 50,
+                width: playerWidth,
+                height: playerHeight,
+                velocityX: 0,
+                velocityY: 0,
+                speed: 5,
+                jumping: false,
+                direction: 1
+            };
+            
+            // Создание платформ
+            game.platforms = [
+                {x: 0, y: canvas.height - 20, width: canvas.width, height: 20},
+                {x: 200, y: 450, width: 150, height: 20},
+                {x: 500, y: 400, width: 150, height: 20},
+                {x: 100, y: 350, width: 120, height: 20},
+                {x: 400, y: 300, width: 120, height: 20},
+                {x: 650, y: 250, width: 150, height: 20},
+                {x: 300, y: 200, width: 200, height: 20}
+            ];
+            
+            // Создание пива
+            game.beers = [];
+            for (let i = 0; i < 15; i++) {
+                game.beers.push({
+                    x: Math.random() * (canvas.width - 30),
+                    y: Math.random() * (canvas.height - 200) + 100,
+                    width: 20,
+                    height: 30,
+                    collected: false
+                });
+            }
+            
+            // Создание врагов
+            game.enemies = [
+                {x: 400, y: canvas.height - 50, width: 40, height: 40, speed: 2, type: 'tax'}, // Налоговая
+                {x: 600, y: 200, width: 40, height: 50, speed: 1.5, type: 'bandit'} // Бандит
+            ];
+            
+            // Ностальгические предметы
+            game.nostalgiaItems = [
+                {x: 700, y: 200, width: 30, height: 30, type: 'cassette'},
+                {x: 100, y: 300, width: 40, height: 30, type: 'vhs'}
+            ];
+            
+            updateUI();
+        }
+
+        // Обновление интерфейса
+        function updateUI() {
+            scoreDisplay.textContent = `Очки: ${game.score}`;
+            livesDisplay.textContent = `Жизни: ${game.lives}`;
+            beerDisplay.textContent = `Пиво: ${game.beerCollected}/10`;
+        }
+
+        // Обновление игрока
+        function updatePlayer() {
+            // Движение влево/вправо
+            if (game.keys['ArrowLeft']) {
+                game.player.velocityX = -game.player.speed;
+                game.player.direction = -1;
+            } else if (game.keys['ArrowRight']) {
+                game.player.velocityX = game.player.speed;
+                game.player.direction = 1;
+            } else {
+                game.player.velocityX = 0;
+            }
+            
+            // Прыжок
+            if (game.keys['Space'] && !game.player.jumping) {
+                game.player.velocityY = -13;
+                game.player.jumping = true;
+            }
+            
+            // Применение гравитации
+            game.player.velocityY += game.gravity;
+            game.player.y += game.player.velocityY;
+            game.player.x += game.player.velocityX;
+            
+            // Проверка столкновений с платформами
+            game.player.jumping = true;
+            game.platforms.forEach(platform => {
+                // Столкновение сверху
+                if (
+                    game.player.x < platform.x + platform.width &&
+                    game.player.x + game.player.width > platform.x &&
+                    game.player.y + game.player.height <= platform.y &&
+                    game.player.y + game.player.height + game.player.velocityY >= platform.y
+                ) {
+                    game.player.jumping = false;
+                    game.player.velocityY = 0;
+                    game.player.y = platform.y - game.player.height;
+                }
+                
+                // Столкновение сбоку
+                if (
+                    game.player.y < platform.y + platform.height &&
+                    game.player.y + game.player.height > platform.y &&
+                    game.player.x + game.player.width > platform.x &&
+                    game.player.x < platform.x + platform.width
+                ) {
+                    if (game.player.velocityX > 0) {
+                        game.player.x = platform.x - game.player.width;
+                    } else if (game.player.velocityX < 0) {
+                        game.player.x = platform.x + platform.width;
+                    }
+                }
+            });
+            
+            // Границы экрана
+            if (game.player.x < 0) game.player.x = 0;
+            if (game.player.x + game.player.width > canvas.width) game.player.x = canvas.width - game.player.width;
+            if (game.player.y > canvas.height) {
+                game.lives--;
+                updateUI();
+                game.player.x = 50;
+                game.player.y = canvas.height - playerHeight - 50;
+                game.player.velocityY = 0;
+                if (game.lives <= 0) {
+                    gameOver();
+                }
+            }
+        }
+
+        // Обновление пива
+        function updateBeers() {
+            game.beers.forEach(beer => {
+                if (!beer.collected && 
+                    game.player.x < beer.x + beer.width &&
+                    game.player.x + game.player.width > beer.x &&
+                    game.player.y < beer.y + beer.height &&
+                    game.player.y + game.player.height > beer.y
+                ) {
+                    beer.collected = true;
+                    game.score += 50;
+                    game.beerCollected++;
+                    updateUI();
+                    
+                    // Бонус за 10 пива
+                    if (game.beerCollected >= 10) {
+                        game.score += 500;
+                        game.lives++;
+                        game.beerCollected = 0;
+                        updateUI();
+                    }
+                }
+            });
+        }
+
+        // Обновление врагов
+        function updateEnemies() {
+            game.enemies.forEach(enemy => {
+                // Движение врагов
+                if (enemy.type === 'tax') {
+                    enemy.x += enemy.speed;
+                    if (enemy.x > canvas.width - 50 || enemy.x < 350) {
+                        enemy.speed *= -1;
+                    }
+                }
+                
+                // Проверка столкновения с игроком
+                if (
+                    game.player.x < enemy.x + enemy.width &&
+                    game.player.x + game.player.width > enemy.x &&
+                    game.player.y < enemy.y + enemy.height &&
+                    game.player.y + game.player.height > enemy.y
+                ) {
+                    game.lives--;
+                    updateUI();
+                    game.player.x = 50;
+                    game.player.y = canvas.height - playerHeight - 50;
+                    game.player.velocityY = 0;
+                    if (game.lives <= 0) {
+                        gameOver();
+                    }
+                }
+            });
+        }
+
+        // Обновление ностальгических предметов
+        function updateNostalgiaItems() {
+            game.nostalgiaItems.forEach(item => {
+                if (
+                    game.player.x < item.x + item.width &&
+                    game.player.x + game.player.width > item.x &&
+                    game.player.y < item.y + item.height &&
+                    game.player.y + game.player.height > item.y
+                ) {
+                    game.score += 200;
+                    updateUI();
+                    // Удаляем собранный предмет
+                    game.nostalgiaItems = game.nostalgiaItems.filter(i => i !== item);
+                }
+            });
+        }
+
+        // Конец игры
+        function gameOver() {
+            game.running = false;
+            finalScoreDisplay.textContent = `Счет: ${game.score}`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        // Отрисовка игрока
+        function drawPlayer() {
+            ctx.fillStyle = '#1E90FF';
+            ctx.fillRect(game.player.x, game.player.y, game.player.width, game.player.height);
+            
+            // Голова
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(game.player.x + game.player.width/2, game.player.y + 15, 15, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Глаза
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(game.player.x + game.player.width/2 + (5 * game.player.direction), 
+                    game.player.y + 15, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Тело
+            ctx.fillStyle = '#1E90FF';
+            ctx.fillRect(game.player.x + 5, game.player.y + 30, game.player.width - 10, 30);
+            
+            // Ноги
+            ctx.fillStyle = '#006400';
+            ctx.fillRect(game.player.x + 5, game.player.y + 55, 10, 5);
+            ctx.fillRect(game.player.x + 25, game.player.y + 55, 10, 5);
+        }
+
+        // Отрисовка платформ
+        function drawPlatforms() {
+            ctx.fillStyle = '#8B4513';
+            game.platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                
+                // Текстура платформы
+                ctx.fillStyle = '#A0522D';
+                for (let i = 0; i < platform.width; i += 20) {
+                    ctx.fillRect(platform.x + i, platform.y, 10, platform.height);
+                }
+                ctx.fillStyle = '#8B4513';
+            });
+        }
+
+        // Отрисовка пива
+        function drawBeers() {
+            game.beers.forEach(beer => {
+                if (!beer.collected) {
+                    // Банка пива
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(beer.x, beer.y, beer.width, beer.height);
+                    
+                    // Верх банки
+                    ctx.fillStyle = '#C0C0C0';
+                    ctx.fillRect(beer.x - 2, beer.y, beer.width + 4, 5);
+                    
+                    // Логотип
+                    ctx.fillStyle = '#FF0000';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText('Ж', beer.x + 7, beer.y + 20);
+                }
+            });
+        }
+
+        // Отрисовка врагов
+        function drawEnemies() {
+            game.enemies.forEach(enemy => {
+                if (enemy.type === 'tax') {
+                    // Налоговая
+                    ctx.fillStyle = '#FF0000';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                    
+                    // Надпись
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText('НАЛОГ', enemy.x + 5, enemy.y + 20);
+                    ctx.fillText('ОВАЯ', enemy.x + 5, enemy.y + 35);
+                } else if (enemy.type === 'bandit') {
+                    // Бандит
+                    ctx.fillStyle = '#2F4F4F';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                    
+                    // Голова
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(enemy.x + enemy.width/2, enemy.y + 15, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Повязка на глазу
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(enemy.x + 10, enemy.y + 10, 20, 5);
+                    
+                    // Тело
+                    ctx.fillStyle = '#2F4F4F';
+                    ctx.fillRect(enemy.x + 5, enemy.y + 30, enemy.width - 10, 20);
+                }
+            });
+        }
+
+        // Отрисовка ностальгических предметов
+        function drawNostalgiaItems() {
+            game.nostalgiaItems.forEach(item => {
+                if (item.type === 'cassette') {
+                    // Кассета
+                    ctx.fillStyle = '#696969';
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
+                    
+                    ctx.fillStyle = '#A9A9A9';
+                    ctx.fillRect(item.x + 5, item.y + 5, 20, 20);
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(item.x + 10, item.y + 10, 10, 10);
+                } else if (item.type === 'vhs') {
+                    // Видеокассета
+                    ctx.fillStyle = '#000080';
+                    ctx.fillRect(item.x, item.y, item.width, item.height);
+                    
+                    ctx.fillStyle = '#ADD8E6';
+                    ctx.fillRect(item.x + 5, item.y + 5, 30, 20);
+                    
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText('VHS', item.x + 12, item.y + 18);
+                }
+            });
+        }
+
+        // Отрисовка фона
+        function drawBackground() {
+            // Градиентное небо
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#1d2b64');
+            gradient.addColorStop(1, '#3a6186');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Городской фон
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            for (let i = 0; i < 10; i++) {
+                const width = 40 + Math.random() * 60;
+                const height = 100 + Math.random() * 200;
+                ctx.fillRect(i * 80 + 20, canvas.height - height - 20, width, height);
+                
+                // Окна
+                ctx.fillStyle = 'rgba(255, 255, 100, 0.4)';
+                for (let y = 0; y < 5; y++) {
+                    for (let x = 0; x < 3; x++) {
+                        if (Math.random() > 0.3) {
+                            ctx.fillRect(
+                                i * 80 + 25 + x * 15, 
+                                canvas.height - height - 10 + y * 25, 
+                                10, 15
+                            );
+                        }
+                    }
+                }
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            }
+            
+            // Луна
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(700, 80, 40, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Кратеры
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+            ctx.beginPath();
+            ctx.arc(690, 60, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(720, 90, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Отрисовка игры
+        function drawGame() {
+            drawBackground();
+            drawPlatforms();
+            drawBeers();
+            drawEnemies();
+            drawNostalgiaItems();
+            drawPlayer();
+            
+            // Индикатор направления
+            if (game.player.direction === 1) {
+                ctx.fillStyle = '#00FF00';
+                ctx.font = '20px Arial';
+                ctx.fillText('→', 20, 30);
+            } else {
+                ctx.fillStyle = '#00FF00';
+                ctx.font = '20px Arial';
+                ctx.fillText('←', 20, 30);
+            }
+        }
+
+        // Игровой цикл
+        function gameLoop() {
+            if (!game.running) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            updatePlayer();
+            updateBeers();
+            updateEnemies();
+            updateNostalgiaItems();
+            drawGame();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Инициализация
+        resetGame();
+    </script>
+</body>
+</html>
