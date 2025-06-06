@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Пиксельное Сердце: Расширенная версия</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #222;
+      overflow: hidden;
+      font-family: monospace;
+      color: white;
+    }
+    canvas {
+      display: block;
+      background: #444;
+      margin: auto;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      image-rendering: pixelated;
+      width: 90vw;
+      height: 90vh;
+    }
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 10;
+    }
+    .btn {
+      width: 60px;
+      height: 60px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      font-size: 24px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 60px;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    .menu {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 20;
+    }
+    .menu h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+    }
+    .menu button {
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      margin: 10px;
+      cursor: pointer;
+    }
+    .transition {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: black;
+      opacity: 0;
+      transition: opacity 1s ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="menu" id="menu">
+  <h1>Пиксельное Сердце</h1>
+  <button onclick="startGame()">Играть</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Экран перехода -->
+<div class="transition" id="transitionScreen"></div>
+
+<!-- Управление -->
+<div class="controls">
+  <div class="btn" id="leftBtn">&#8592;</div>
+  <div class="btn" id="rightBtn">&#8594;</div>
+  <div class="btn" id="jumpBtn">Jump</div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+// Кнопки управления
+document.getElementById('leftBtn').addEventListener('touchstart', () => keys['ArrowLeft'] = true);
+document.getElementById('leftBtn').addEventListener('touchend', () => keys['ArrowLeft'] = false);
+document.getElementById('rightBtn').addEventListener('touchstart', () => keys['ArrowRight'] = true);
+document.getElementById('rightBtn').addEventListener('touchend', () => keys['ArrowRight'] = false);
+document.getElementById('jumpBtn').addEventListener('touchstart', () => keys[' '] = true);
+document.getElementById('jumpBtn').addEventListener('touchend', () => keys[' '] = false);
+
+// Спрайты
+const sprites = {
+  heartIdle: new Image(),
+  heartRun: new Image(),
+  berry: new Image(),
+  spider: new Image(),
+  boss: new Image()
+};
+
+sprites.heartIdle.src = 'https://i.imgur.com/3QqTc7W.png'; 
+sprites.heartRun.src = 'https://i.imgur.com/0yjYzLs.png'; 
+sprites.berry.src = 'https://i.imgur.com/QCvJGtM.png'; 
+sprites.spider.src = 'https://i.imgur.com/kBwNnKp.png'; 
+sprites.boss.src = 'https://i.imgur.com/ZbDfEaV.png'; 
+
+// Звуки
+const sounds = {
+  jump: new Audio('https://freesound.org/data/previews/36/36613_315158-lq.mp3'), 
+  collect: new Audio('https://freesound.org/data/previews/65/65174_1081555-lq.mp3'), 
+  hit: new Audio('https://freesound.org/data/previews/243/243225_4682258-lq.mp3'), 
+  levelUp: new Audio('https://freesound.org/data/previews/233/233597_4682258-lq.mp3'), 
+  bgMusic: new Audio('https://files.catbox.moe/p94o7r.mp3') 
+};
+
+sounds.bgMusic.loop = true;
+
+// Уровни
+const levels = [
+  [], // уровень 0 пустой
+  [ // уровень 1
+    {x: 0, y: 400, width: 400, height: 20},
+    {x: 200, y: 300, width: 200, height: 20}
+  ],
+  [ // уровень 2
+    {x: 0, y: 400, width: 300, height: 20},
+    {x: 250, y: 300, width: 200, height: 20},
+    {x: 500, y: 200, width: 150, height: 20}
+  ],
+  [ // уровень 3 (финальный)
+    {x: 0, y: 400, width: 200, height: 20},
+    {x: 250, y: 350, width: 150, height: 20},
+    {x: 450, y: 300, width: 100, height: 20},
+    {x: 600, y: 250, width: 80, height: 20},
+    {x: 700, y: 200, width: 60, height: 20}
+  ]
+];
+
+let currentLevel = 1;
+let score = 0;
+let lives = 3;
+let timeLeft = 60;
+let gameRunning = false;
+let isBossLevel = false;
+
+// Игрок
+const player = {
+  x: 50,
+  y: 0,
+  width: 32,
+  height: 32,
+  vx: 0,
+  vy: 0,
+  onGround: false,
+  direction: 'right'
+};
+
+let berries = [];
+let spiders = [];
+let boss = null;
+
+function startGame() {
+  document.getElementById('menu').style.display = 'none';
+  resetGame();
+  sounds.bgMusic.play();
+  gameRunning = true;
+  requestAnimationFrame(gameLoop);
+}
+
+function resetGame() {
+  currentLevel = 1;
+  isBossLevel = false;
+  score = 0;
+  lives = 3;
+  timeLeft = 60;
+  loadLevel();
+}
+
+function loadLevel() {
+  player.x = 50;
+  player.y = 0;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = false;
+
+  berries = Array.from({length: 5}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height - 100,
+    width: 16,
+    height: 16
+  }));
+
+  if (currentLevel === 3) {
+    isBossLevel = true;
+    spiders = [];
+    boss = {
+      x: 600,
+      y: 50,
+      width: 64,
+      height: 64,
+      health: 5
+    };
+  } else {
+    isBossLevel = false;
+    spiders = Array.from({length: 2 + currentLevel}, () => ({
+      x: Math.random() * canvas.width,
+      y: 0,
+      width: 32,
+      height: 32,
+      speed: 1 + Math.random() * (currentLevel * 0.5),
+    }));
+    boss = null;
+  }
+
+  showTransition(`Уровень ${currentLevel}`);
+}
+
+function showTransition(text) {
+  const screen = document.getElementById('transitionScreen');
+  screen.style.opacity = 1;
+  screen.innerHTML = `<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem;">${text}</div>`;
+  setTimeout(() => {
+    screen.style.opacity = 0;
+    setTimeout(() => screen.innerHTML = '', 1000);
+  }, 1000);
+}
+
+function update() {
+  if (!gameRunning) return;
+
+  // Таймер
+  timeLeft -= 1 / 60;
+  if (timeLeft <= 0) {
+    lives--;
+    if (lives > 0) {
+      timeLeft = 60;
+      resetGame();
+    } else {
+      endGame("Время вышло!");
+    }
+  }
+
+  // Горизонтальное движение
+  if (keys['ArrowLeft']) {
+    player.vx = -4;
+    player.direction = 'left';
+  } else if (keys['ArrowRight']) {
+    player.vx = 4;
+    player.direction = 'right';
+  } else {
+    player.vx = 0;
+  }
+
+  if ((keys[' '] || keys['Spacebar']) && player.onGround) {
+    player.vy = -15;
+    player.onGround = false;
+    sounds.jump.currentTime = 0;
+    sounds.jump.play();
+  }
+
+  // Гравитация
+  player.vy += 0.8;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // Коллизия с платформами
+  player.onGround = false;
+  levels[currentLevel].forEach(p => {
+    if (
+      player.x < p.x + p.width &&
+      player.x + player.width > p.x &&
+      player.y + player.height > p.y &&
+      player.y + player.height < p.y + p.height + player.vy
+    ) {
+      player.y = p.y - player.height;
+      player.vy = 0;
+      player.onGround = true;
+    }
+  });
+
+  // Проверка выхода за экран
+  if (player.y > canvas.height) {
+    lives--;
+    if (lives > 0) {
+      timeLeft = 60;
+      resetGame();
+    } else {
+      endGame("Вы упали!");
+    }
+  }
+
+  // Сбор ягод
+  berries = berries.filter(b => {
+    if (
+      player.x < b.x + b.width &&
+      player.x + player.width > b.x &&
+      player.y < b.y + b.height &&
+      player.y + player.height > b.y
+    ) {
+      score += 10;
+      sounds.collect.play();
+      return false;
+    }
+    return true;
+  });
+
+  // Пауки
+  if (!isBossLevel) {
+    spiders.forEach(s => {
+      s.y += s.speed;
+      if (s.y > canvas.height) s.y = 0;
+
+      if (
+        player.x < s.x + s.width &&
+        player.x + player.width > s.x &&
+        player.y < s.y + s.height &&
+        player.y + player.height > s.y
+      ) {
+        lives--;
+        if (lives > 0) {
+          timeLeft = 60;
+          resetGame();
+        } else {
+          endGame("Вы столкнулись с пауком!");
+        }
+      }
+    });
+  } else {
+    // Босс
+    boss.x -= 1;
+    if (boss.x < -boss.width) boss.x = canvas.width;
+
+    if (
+      player.x < boss.x + boss.width &&
+      player.x + player.width > boss.x &&
+      player.y < boss.y + boss.height &&
+      player.y + player.height > boss.y
+    ) {
+      lives--;
+      if (lives > 0) {
+        timeLeft = 60;
+        resetGame();
+      } else {
+        endGame("Вы столкнулись с боссом!");
+      }
+    }
+
+    if (keys[' '] && player.x + player.width > boss.x && player.x < boss.x + boss.width && player.y + player.height < boss.y + 50) {
+      boss.health--;
+      if (boss.health <= 0) {
+        nextLevel();
+      }
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Фон
+  ctx.fillStyle = '#444';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Платформы
+  ctx.fillStyle = '#8B4513';
+  levels[currentLevel].forEach(p => {
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+  });
+
+  // Игрок
+  const sprite = player.onGround ? sprites.heartRun : sprites.heartIdle;
+  if (player.direction === 'left') {
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprite, -player.x - player.width, player.y, player.width, player.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(sprite, player.x, player.y, player.width, player.height);
+  }
+
+  // Ягодки
+  berries.forEach(b => {
+    ctx.drawImage(sprites.berry, b.x, b.y, b.width, b.height);
+  });
+
+  // Пауки
+  if (!isBossLevel) {
+    spiders.forEach(s => {
+      ctx.drawImage(sprites.spider, s.x, s.y, s.width, s.height);
+    });
+  } else {
+    ctx.drawImage(sprites.boss, boss.x, boss.y, boss.width, boss.height);
+    ctx.fillStyle = 'red';
+    ctx.font = '16px monospace';
+    ctx.fillText("Здоровье босса: " + boss.health, boss.x, boss.y - 10);
+  }
+
+  // UI
+  ctx.fillStyle = 'white';
+  ctx.font = '20px monospace';
+  ctx.fillText("Очки: " + score, 10, 30);
+  ctx.fillText("Жизни: " + lives, 10, 60);
+  ctx.fillText("Время: " + Math.ceil(timeLeft), 10, 90);
+}
+
+function nextLevel() {
+  sounds.levelUp.play();
+  currentLevel++;
+  if (currentLevel > levels.length - 1) {
+    endGame("Вы победили!", true);
+  } else {
+    timeLeft = 60;
+    loadLevel();
+  }
+}
+
+function endGame(reason, win = false) {
+  sounds.bgMusic.pause();
+  gameRunning = false;
+
+  saveScore(score);
+
+  let message = win ? `Вы победили!\nОчки: ${score}` : `Игра окончена.\n${reason}\nОчки: ${score}`;
+  alert(message);
+  document.getElementById('menu').style.display = 'flex';
+  document.getElementById('menu').innerHTML = `
+    <h1>Рекорды</h1>
+    <ul>${getTopScores().map((s, i) => `<li>${i+1}. ${s}</li>`).join('')}</ul>
+    <button onclick="startGame()">Играть снова</button>
+  `;
+}
+
+function getTopScores() {
+  let scores = JSON.parse(localStorage.getItem('pixelHeartScores') || '[]');
+  scores.sort((a, b) => b - a);
+  return scores.slice(0, 5);
+}
+
+function saveScore(score) {
+  let scores = JSON.parse(localStorage.getItem('pixelHeartScores') || '[]');
+  scores.push(score);
+  localStorage.setItem('pixelHeartScores', JSON.stringify(scores));
+}
+
+window.addEventListener('resize', () => {
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * scale;
+  canvas.height = canvas.clientHeight * scale;
+});
+window.dispatchEvent(new Event('resize'));
+</script>
+</body>
+</html>
